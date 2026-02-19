@@ -1,0 +1,211 @@
+{
+  "name": "brief-to-requirements",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "brief-to-requirements",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -848,
+        -64
+      ],
+      "id": "1d282ceb-7329-4792-a08b-22fbbd4196d7",
+      "name": "Webhook",
+      "webhookId": "73d4e084-1bd2-4175-982e-1e7b84f0aaaa"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "54d37170-06ca-46c4-8137-a36aa97a7cce",
+              "name": "run_id",
+              "value": "={{ $json.body.run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "7c1b204d-9a28-4763-8d0f-bdc34396d19b",
+              "name": "is_feedback",
+              "value": "={{ $json.body.is_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "381a0fd4-453c-4ff6-88a7-e99050f52fc5",
+              "name": "feedback",
+              "value": "={{ $json.body.feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "f68fba2d-e1c8-4703-9940-af082ada77b3",
+              "name": "context",
+              "value": "={{ $json.body.context }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        -64
+      ],
+      "id": "3adbb5ed-0780-4a99-a1ec-829b89a015a4",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres STATELESS.\n\nINPUT:\n{\n  \"context\": {{ $json.context }}\n  \"is_feedback\": {{ $json.is_feedback }},\n  \"feedback\": {{ $json.feedback }}\n}\n\nOBJETIVO:\nGenerar o actualizar el artefacto de análisis de requerimientos.\n\nINSTRUCCIONES:\n\nSi is_feedback es false:\n- Analiza el brief en context.\n- Refina el problema de negocio.\n- Identifica dominios.\n- Propón candidatos a bounded contexts.\n- Enumera dependencias externas.\n- Declara supuestos.\n- Genera preguntas de clarificación si existen ambigüedades.\n\nSi is_feedback es true:\n- Modifica el artefacto BA previo presente en context.\n- Aplica estrictamente el feedback.\n- Mantén coherencia estructural.\n\nREGLAS DE LOG OBLIGATORIAS:\n\n1. changes_made debe estar siempre diligenciado.\n2. Si es creación inicial:\n   added = [\"Creación inicial del análisis de requerimientos\"]\n3. Si hay cambios:\n   - Listar dominios añadidos/eliminados\n   - Cambios en problema refinado\n   - Supuestos agregados o removidos\n\n4. justification debe:\n   - Explicar criterios de delimitación de dominios.\n   - Justificar identificación de bounded contexts.\n   - Referenciar complejidad de super app.\n   - Tener mínimo 3 oraciones técnicas.\n\nOUTPUT OBLIGATORIO:\n\n{\n  \"artifact\": {\n    \"problem_statement_refined\": \"\",\n    \"identified_domains\": [],\n    \"core_capabilities\": [],\n    \"external_dependencies\": [],\n    \"assumptions\": []\n  },\n  \"changes_made\": {\n    \"added\": [],\n    \"removed\": [],\n    \"modified\": []\n  },\n  \"justification\": \"\"\n}\n\nNo incluir texto fuera del JSON.",
+        "options": {
+          "systemMessage": "Eres un Business Analyst Senior especializado en ecosistemas de Super Apps \n(fintech, logística, mensajería, movilidad, plataformas multi-servicio)."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -464,
+        -64
+      ],
+      "id": "ea7fc0f6-6450-4f33-bfb5-4baf08822012",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://host.docker.internal:8000/callbacks/agent/requirements",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "run_id",
+              "value": "={{$node[\"Webhook\"].json[\"body\"][\"run_id\"]}}"
+            },
+            {
+              "name": "content",
+              "value": "={{$json}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        384,
+        -80
+      ],
+      "id": "df1a24fe-3eea-4eda-9f19-3b337d8370f7",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        128
+      ],
+      "id": "0a8abb4e-9104-447e-a11b-dee1a6d1b7b1",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "fRHaAKZDFLDwFFOT",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Intenta encontrar el texto del modelo en distintos campos comunes\nconst raw =\n  $json.text ??\n  $json.message ??\n  $json.content ??\n  $json.output ??\n  $json.data ??\n  $json;\n\n// Si no es string, lo devolvemos tal cual\nif (typeof raw !== \"string\") {\n  return [{ json: raw }];\n}\n\nlet cleaned = raw.trim();\n\n// Eliminar bloques ```json ``` si existen\ncleaned = cleaned.replace(/```json/g, \"\");\ncleaned = cleaned.replace(/```/g, \"\");\n\n// Intentar extraer solo el bloque JSON (desde el primer { hasta el último })\nconst firstBrace = cleaned.indexOf(\"{\");\nconst lastBrace = cleaned.lastIndexOf(\"}\");\n\nif (firstBrace === -1 || lastBrace === -1) {\n  throw new Error(\"No se encontró un JSON válido en la respuesta del modelo.\");\n}\n\ncleaned = cleaned.substring(firstBrace, lastBrace + 1);\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (err) {\n  throw new Error(\n    \"El modelo devolvió algo que no es JSON válido. Primeros 500 chars:\\n\" +\n      cleaned.slice(0, 500)\n  );\n}\n\n// Devolvemos el JSON limpio\nreturn [{ json: parsed }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        -64
+      ],
+      "id": "5267e4bf-8e9d-48cd-b3e1-361b98ba5e49",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "771bcef0-0471-42cd-9387-b4e1c84851b4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8a7b9379a080e668be28594ac31a5112fea2cea9fc569fbd98bc97acc85cbba6"
+  },
+  "id": "gA19-DPlGhnZ8-Zev79YF",
+  "tags": []
+}

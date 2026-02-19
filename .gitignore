@@ -1,0 +1,21 @@
+﻿# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Virtual environments
+**/.venv/
+**/venv/
+
+# Local environment files
+**/.env
+
+# Databases and runtime artifacts
+**/*.db
+**/*.sqlite
+
+# OS/editor
+.DS_Store
+Thumbs.db
