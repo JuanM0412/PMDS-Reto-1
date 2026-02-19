@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Agent, Artifact, Run
+from ..models import Agent, Artifact, Run, StepExecution, StepLog
 from ..orchestration import (
     build_context_for_agent,
     get_expected_artifact_type,
@@ -17,11 +17,22 @@ from ..orchestration import (
     get_latest_artifacts_by_type,
     get_next_pipeline_agent,
     get_pipeline_agents,
+    get_pipeline_step,
 )
 from ..schemas import AgentResponse, RejectRunRequest, RunResponse
 from ..services import trigger_agent
 
 router = APIRouter(tags=["orchestrator"])
+
+
+def _add_execution_log(db: Session, execution_id: int, message: str) -> None:
+    db.add(
+        StepLog(
+            execution_id=execution_id,
+            message=message,
+            created_at=datetime.utcnow(),
+        )
+    )
 
 
 def _to_agent_response(agent: Agent | None) -> AgentResponse | None:
@@ -111,7 +122,29 @@ async def agent_callback(
     if not isinstance(content, dict):
         content = {"value": content}
 
-    _save_artifact(db, run_id=run_id, artifact_type=artifact_type, content=content)
+    artifact = _save_artifact(db, run_id=run_id, artifact_type=artifact_type, content=content)
+
+    callback_step = get_pipeline_step(agent_slug)
+    if callback_step:
+        stmt_exec = (
+            select(StepExecution)
+            .where(
+                StepExecution.run_id == run_id,
+                StepExecution.step == callback_step.order,
+                StepExecution.agent_slug == agent_slug,
+            )
+            .order_by(StepExecution.attempt.desc(), StepExecution.started_at.desc())
+            .limit(1)
+        )
+        execution = db.execute(stmt_exec).scalars().first()
+        if execution:
+            if execution.status != "COMPLETED":
+                execution.status = "ARTIFACT_RECEIVED"
+            _add_execution_log(
+                db,
+                execution.id,
+                f"Callback recibido para {agent_slug}; artefacto {artifact_type} v{artifact.version} almacenado.",
+            )
 
     run.current_agent_id = agent.id
     run.status = f"WAITING_APPROVAL_{agent.slug.upper()}"

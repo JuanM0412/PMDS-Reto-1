@@ -1,0 +1,38 @@
+/* Variables y reset mínimo */
+:root {
+  --chat-bg: #0f0f12;
+  --header-bg: #18181c;
+  --border: #2a2a30;
+  --text-primary: #f0f0f2;
+  --text-muted: #9a9aa5;
+  --input-bg: #1e1e24;
+  --hover-bg: #25252c;
+  --primary: #6366f1;
+  --primary-text: #fff;
+  --bubble-own: #6366f1;
+  --bubble-other: #25252c;
+  --attachment-bg: #1e1e24;
+  --link: #818cf8;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--chat-bg);
+  color: var(--text-primary);
+}
+
+#app {
+  min-height: 100vh;
+}

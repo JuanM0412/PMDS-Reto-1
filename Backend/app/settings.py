@@ -12,10 +12,12 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./app.db"
 
     # n8n
-    n8n_webhook_url: AnyUrl  # e.g. http://localhost:5678/webhook/brief-to-req
+    n8n_webhook_url: AnyUrl | None = None
     n8n_api_key: str | None = None  # si protegen n8n con header
 
-    request_timeout_seconds: float = 20.0
+    request_timeout_seconds: float = 95.0
+    step_wait_timeout_seconds: float = 90.0
+    artifact_poll_interval_seconds: float = 1.0
 
 
 settings = Settings()

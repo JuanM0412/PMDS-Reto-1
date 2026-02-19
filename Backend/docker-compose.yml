@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: reto1_multiagentes_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: reto1_multiagentes
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345678
+    ports:
+      - "5432:5432"
+    volumes:
+      - reto1_multiagentes_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reto1_multiagentes"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  reto1_multiagentes_pgdata:

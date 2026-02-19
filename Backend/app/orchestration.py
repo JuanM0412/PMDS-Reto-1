@@ -66,10 +66,15 @@ PIPELINE_STEPS: list[PipelineStep] = [
 
 PIPELINE_SLUGS = [step.slug for step in PIPELINE_STEPS]
 PIPELINE_BY_SLUG = {step.slug: step for step in PIPELINE_STEPS}
+PIPELINE_BY_ORDER = {step.order: step for step in PIPELINE_STEPS}
 
 
 def get_pipeline_step(slug: str) -> PipelineStep | None:
     return PIPELINE_BY_SLUG.get(slug)
+
+
+def get_pipeline_step_by_order(order: int) -> PipelineStep | None:
+    return PIPELINE_BY_ORDER.get(order)
 
 
 def get_expected_artifact_type(agent_slug: str) -> str | None:

@@ -8,9 +8,8 @@ from sqlalchemy.orm import Session
 from .db import Base, engine
 from .models import Agent
 from .orchestration import PIPELINE_STEPS
-from .routers.artifacts import router as artifacts_router
+from .routers.chat import router as chat_router
 from .routers.orchestrator import router as orchestrator_router
-from .routers.runs import router as runs_router
 from .settings import settings
 from .utils.logging import setup_logging
 
@@ -94,8 +93,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(runs_router)
-app.include_router(artifacts_router)
+app.include_router(chat_router)
 app.include_router(orchestrator_router)
 
 
