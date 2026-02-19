@@ -10,10 +10,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -1344,
-        -16
+        -2112,
+        384
       ],
-      "id": "b2a57eeb-90dd-48b6-873f-8fb83eb9f4cd",
+      "id": "11f52fa7-beea-4f89-a9e1-42875aa32c91",
       "name": "Webhook",
       "webhookId": "73d4e084-1bd2-4175-982e-1e7b84f0aaaa"
     },
@@ -52,10 +52,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -1136,
-        -16
+        -1904,
+        384
       ],
-      "id": "5c6491e7-2231-48e7-a839-4109e0e13fac",
+      "id": "316aec9c-ae86-49f2-8fd8-f32fd3289621",
       "name": "Edit Fields"
     },
     {
@@ -69,16 +69,16 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        -960,
-        -16
+        -1728,
+        384
       ],
-      "id": "61fa3907-e900-4eee-91f5-fd0c65947ca4",
+      "id": "93f36c87-5774-4202-8017-12b462fe4650",
       "name": "AI Agent"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://host.docker.internal:8000/callbacks/agent/qa",
+        "url": "=http://host.docker.internal:8000/callbacks/agent/{slug}",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -97,10 +97,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -256,
-        -32
+        -1184,
+        384
       ],
-      "id": "e6d93639-8a95-4e63-bcd7-493ca39dbad1",
+      "id": "15fb23df-424a-4396-a3fa-b23d73513f21",
       "name": "HTTP Request"
     },
     {
@@ -111,14 +111,14 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
-        -1024,
-        176
+        -1792,
+        576
       ],
-      "id": "2047e500-051a-4824-afc1-302b42699f07",
+      "id": "68613847-fafc-4dd4-996d-d829f5f7809e",
       "name": "Groq Chat Model",
       "credentials": {
         "groqApi": {
-          "id": "fRHaAKZDFLDwFFOT",
+          "id": "6W1kVDttCFtf5042",
           "name": "Groq account"
         }
       }
@@ -130,10 +130,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -496,
-        0
+        -1376,
+        400
       ],
-      "id": "4627689e-6bb8-4edd-8d8f-7f87f18f1609",
+      "id": "4fee5880-f250-4e9a-b0f9-bc6167fbe7e9",
       "name": "Code in JavaScript"
     }
   ],
@@ -195,16 +195,17 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "a50b619a-1f25-4fe7-a9ee-6e9bc40cf764",
+  "versionId": "2f4ee347-5cae-4b4c-90f1-439542fa01ab",
   "meta": {
-    "instanceId": "8a7b9379a080e668be28594ac31a5112fea2cea9fc569fbd98bc97acc85cbba6"
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2c602997e13032fa05ecc33deb70e2fbde4447f9b25778661244630cfd2b3a6"
   },
-  "id": "P74jz1GaU5serWe2Nda60",
+  "id": "hu1yHIGzz1PXcwCV",
   "tags": []
 }
