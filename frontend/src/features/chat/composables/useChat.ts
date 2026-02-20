@@ -53,12 +53,35 @@ export function useChat() {
     currentAgentIndex.value = nextIndex
     agentStatuses.value[nextIndex - 1] = 'running'
 
+    // Build context from the previous agent's artifacts
+    let context = ''
+    const prevStep = nextIndex - 1
+    if (prevStep >= 1 && currentMessageUuid.value) {
+      try {
+        const artifacts = await ChatService.getArtifacts(prevStep, currentMessageUuid.value)
+        const artifactContents: Record<string, unknown> = {}
+        for (const artifact of artifacts) {
+          const content = await ChatService.getArtifactDownload(
+            prevStep,
+            currentMessageUuid.value,
+            artifact.id,
+          )
+          artifactContents[artifact.id] = content
+        }
+        if (Object.keys(artifactContents).length > 0) {
+          context = JSON.stringify(artifactContents)
+        }
+      } catch {
+        // proceed without context if artifact fetch fails
+      }
+    }
+
     try {
       const result = await ChatService.postStep(
         nextIndex,
         currentMessageUuid.value,
-        '',
-        false
+        context,
+        false,
       )
       agentStatuses.value[nextIndex - 1] = 'completed'
       pushBotMessage(result.message, nextIndex, currentOriginalMessageId.value)

@@ -1,0 +1,215 @@
+{
+  "name": "QA",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "QA",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1088,
+        0
+      ],
+      "id": "f1c6b496-7e49-41de-9f5e-046d9bb39e3e",
+      "name": "Webhook",
+      "webhookId": "73d4e084-1bd2-4175-982e-1e7b84f0aaaa"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c1b204d-9a28-4763-8d0f-bdc34396d19b",
+              "name": "is_feedback",
+              "value": "={{ $json.body.is_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "381a0fd4-453c-4ff6-88a7-e99050f52fc5",
+              "name": "feedback",
+              "value": "={{ $json.body.feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "f68fba2d-e1c8-4703-9940-af082ada77b3",
+              "name": "context",
+              "value": "={{ $json.body.context }}",
+              "type": "string"
+            },
+            {
+              "id": "0f8ce43b-c059-49d1-a8b3-772103117301",
+              "name": "uuid",
+              "value": "={{ $json.body.uuid }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -864,
+        0
+      ],
+      "id": "c02fe7c7-d811-46d1-9edc-ef72a09eb422",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres STATELESS.\n\nINPUT:\n{\n  \"context\":{{ $json.context }},\n  \"is_feedback\": {{ $json.is_feedback }},\n  \"feedback\": {{ $json.feedback }}\n}\n\nOBJETIVO:\nGenerar o actualizar diseño de casos de prueba.\n\nOBJETIVO:\nGenerar o actualizar diseño de casos de prueba.\n\nINSTRUCCIONES:\n\nSi is_feedback es false:\n- Genera test suites alineadas a historias.\n- Incluye funcional, negativo, edge, integración.\n- Si aplica IA, incluye validaciones de comportamiento.\n\nSi is_feedback es true:\n- Ajusta pruebas según cambios en historias.\n\nREGLAS DE LOG:\n\nSi creación inicial:\nadded = [\"Creación inicial de suites de prueba\"]\n\nSi cambios:\n- Casos añadidos\n- Casos eliminados\n- Escenarios modificados\n\njustification debe:\n- Explicar cobertura de riesgos.\n- Justificar pruebas de integración.\n- Relacionar con arquitectura distribuida.\n- Mínimo 3 oraciones técnicas.\n\nOUTPUT:\n\n{\n  \"artifact\": {\n    \"test_suites\": []\n  },\n  \"changes_made\": {\n    \"added\": [],\n    \"removed\": [],\n    \"modified\": []\n  },\n  \"justification\": \"\"\n}\n\nSolo JSON.",
+        "options": {
+          "systemMessage": "Eres un QA Architect Senior especializado en plataformas distribuidas."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -640,
+        0
+      ],
+      "id": "78e167fa-dea9-43d1-88b6-00bcd2f847eb",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://172.17.0.1:8000/api/n8n/callback",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "artifact_type",
+              "value": "test_suites"
+            },
+            {
+              "name": "content",
+              "value": "={{ $('AI Agent').item.json.output }}"
+            },
+            {
+              "name": "uuid",
+              "value": "={{ $('Edit Fields').item.json.uuid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -64,
+        0
+      ],
+      "id": "1c51dedc-09ba-498f-a378-58092e1f41dc",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        224
+      ],
+      "id": "f96db76d-7e94-4e14-93b7-b1835ec40979",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "LBuhT440NDQhrpab",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node (JavaScript)\n// Soluciona: \"Unexpected non-whitespace character after JSON...\"\n// Extrayendo el PRIMER JSON completo (objeto o array) por balanceo de llaves/corchetes.\n\nfunction getRaw(item) {\n  const j = item.json ?? {};\n  return j.output ?? j.text ?? j.message ?? j.content ?? j.data ?? j;\n}\n\nfunction extractFirstJsonValue(text) {\n  if (typeof text !== \"string\") text = String(text);\n\n  // Si viene dentro de ```json ... ``` o ``` ... ```, primero intenta sacar el contenido del fence\n  const fence = text.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/i);\n  if (fence?.[1]) text = fence[1];\n\n  // Busca inicio de JSON: { o [\n  const startObj = text.indexOf(\"{\");\n  const startArr = text.indexOf(\"[\");\n  let start = -1;\n\n  if (startObj === -1) start = startArr;\n  else if (startArr === -1) start = startObj;\n  else start = Math.min(startObj, startArr);\n\n  if (start === -1) return null;\n\n  // Scanner para encontrar el final exacto del JSON (balanceando y respetando strings)\n  let inString = false;\n  let escape = false;\n  let depth = 0;\n  let opener = text[start];\n  let closer = opener === \"{\" ? \"}\" : \"]\";\n\n  for (let i = start; i < text.length; i++) {\n    const ch = text[i];\n\n    if (inString) {\n      if (escape) {\n        escape = false;\n      } else if (ch === \"\\\\\") {\n        escape = true;\n      } else if (ch === '\"') {\n        inString = false;\n      }\n      continue;\n    }\n\n    if (ch === '\"') {\n      inString = true;\n      continue;\n    }\n\n    if (ch === opener) depth++;\n    else if (ch === closer) depth--;\n\n    if (depth === 0) {\n      return text.slice(start, i + 1).trim();\n    }\n  }\n\n  // Si no cerró, no es JSON completo\n  return null;\n}\n\nfunction safeParseJson(text) {\n  // Limpieza ligera por si vienen comillas “ ”\n  const cleaned = text.replace(/[“”]/g, '\"').replace(/[‘’]/g, \"'\");\n  return JSON.parse(cleaned);\n}\n\n// --- MAIN ---\nconst out = [];\n\nfor (const item of items) {\n  const raw = getRaw(item);\n\n  // Si ya es objeto/array, pásalo directo\n  if (raw && typeof raw === \"object\") {\n    out.push({ json: raw });\n    continue;\n  }\n\n  const txt = String(raw);\n  const jsonStr = extractFirstJsonValue(txt);\n\n  if (!jsonStr) {\n    throw new Error(\n      \"No encontré un JSON completo en el texto. Primeros 300 chars:\\n\" +\n      txt.slice(0, 300)\n    );\n  }\n\n  const parsed = safeParseJson(jsonStr);\n  out.push({ json: parsed });\n}\n\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "ae78c949-97df-445f-846b-c79f8d2e9a3a",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "00f64eaf-79d2-4267-917c-9d6b32392b2d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "25ee1770c261de73139c36014a95a21fcc2846a4fe303f685f404c9fcee55320"
+  },
+  "id": "4v2M23FdQnoMWz9I",
+  "tags": []
+}
