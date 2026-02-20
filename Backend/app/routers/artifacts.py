@@ -17,6 +17,7 @@ from ..schemas import (
     ArtifactResponse,
     RunArtifactsExportResponse,
 )
+from ..utils.mermaid import normalize_mermaid_artifact
 
 router = APIRouter(prefix="/runs/{run_id}/artifacts", tags=["artifacts"])
 
@@ -60,11 +61,12 @@ def create_artifact(run_id: str, body: ArtifactCreateRequest, db: Session = Depe
             content_dict = extra_payload
         else:
             raise HTTPException(status_code=400, detail="content is required")
+    normalized_content = normalize_mermaid_artifact(content_dict)
     artifact = Artifact(
         run_id=run_id,
         artifact_type=artifact_type,
         version=next_version,
-        content_json=json.dumps(content_dict, ensure_ascii=False),
+        content_json=json.dumps(normalized_content, ensure_ascii=False),
         created_at=datetime.utcnow(),
     )
     db.add(artifact)
@@ -85,7 +87,7 @@ def create_artifact(run_id: str, body: ArtifactCreateRequest, db: Session = Depe
         artifact_type=artifact.artifact_type,
         version=artifact.version,
         created_at=artifact.created_at,
-        content=content_dict,
+        content=normalized_content,
     )
 
 
@@ -114,7 +116,7 @@ def get_latest_artifact(
     if not artifact:
         raise HTTPException(status_code=404, detail="Artifact not found")
 
-    content = json.loads(artifact.content_json)
+    content = normalize_mermaid_artifact(json.loads(artifact.content_json))
     return ArtifactResponse(
         id=artifact.id,
         run_id=artifact.run_id,
@@ -146,7 +148,7 @@ def export_artifacts(run_id: str, db: Session = Depends(get_db)):
     items: list[ArtifactExportItem] = []
     for artifact in latest_by_type.values():
         try:
-            content = json.loads(artifact.content_json)
+            content = normalize_mermaid_artifact(json.loads(artifact.content_json))
         except json.JSONDecodeError:
             content = {"raw_content": artifact.content_json}
 

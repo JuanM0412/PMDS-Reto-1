@@ -2,6 +2,11 @@
 import { ref } from 'vue'
 import { useChat } from '@/features/chat/composables/useChat'
 import type { AgentStatus } from '@/features/chat/composables/useChat'
+import MermaidDiagramPreview from '@/features/chat/components/MermaidDiagramPreview.vue'
+import {
+  extractMermaidBlocks,
+  type MermaidBlockInterface,
+} from '@/shared/utils/MermaidArtifactUtil'
 
 const {
   addMessage,
@@ -30,6 +35,19 @@ const boxLogsLoadingByIndex = ref<Record<number, boolean>>({})
 const openArtifactsBoxIndices = ref<number[]>([])
 const boxArtifactsByIndex = ref<Record<number, { id: string; name: string }[]>>({})
 const boxArtifactsLoadingByIndex = ref<Record<number, boolean>>({})
+const artifactPreviewByIndex = ref<
+  Record<
+    number,
+    | {
+        artifactId: string
+        artifactName: string
+        blocks: MermaidBlockInterface[]
+      }
+    | undefined
+  >
+>({})
+const artifactPreviewLoadingByIndex = ref<Record<number, boolean>>({})
+const artifactPreviewErrorByIndex = ref<Record<number, string>>({})
 
 const AGENT_NAMES = [
   'Requirements Agent',
@@ -125,6 +143,8 @@ async function toggleBoxArtifacts(boxIndex: number) {
   if (uuid == null) return
   if (openArtifactsBoxIndices.value.includes(boxIndex)) {
     openArtifactsBoxIndices.value = openArtifactsBoxIndices.value.filter((j) => j !== boxIndex)
+    artifactPreviewByIndex.value = { ...artifactPreviewByIndex.value, [boxIndex]: undefined }
+    artifactPreviewErrorByIndex.value = { ...artifactPreviewErrorByIndex.value, [boxIndex]: '' }
     return
   }
   openArtifactsBoxIndices.value = [...openArtifactsBoxIndices.value, boxIndex]
@@ -135,6 +155,54 @@ async function toggleBoxArtifacts(boxIndex: number) {
     boxArtifactsByIndex.value = { ...boxArtifactsByIndex.value, [boxIndex]: artifacts }
   } finally {
     boxArtifactsLoadingByIndex.value = { ...boxArtifactsLoadingByIndex.value, [boxIndex]: false }
+  }
+}
+
+function isPreviewOpen(boxIndex: number, artifactId: string): boolean {
+  return artifactPreviewByIndex.value[boxIndex]?.artifactId === artifactId
+}
+
+async function handlePreviewArtifact(boxIndex: number, art: { id: string; name: string }) {
+  const uuid = currentMessageUuid.value
+  if (uuid == null) return
+
+  if (isPreviewOpen(boxIndex, art.id)) {
+    artifactPreviewByIndex.value = { ...artifactPreviewByIndex.value, [boxIndex]: undefined }
+    artifactPreviewErrorByIndex.value = { ...artifactPreviewErrorByIndex.value, [boxIndex]: '' }
+    return
+  }
+
+  const step = boxIndex + 1
+  artifactPreviewLoadingByIndex.value = { ...artifactPreviewLoadingByIndex.value, [boxIndex]: true }
+  artifactPreviewErrorByIndex.value = { ...artifactPreviewErrorByIndex.value, [boxIndex]: '' }
+  try {
+    const payload = await fetchArtifactDownload(step, uuid, art.id)
+    const blocks = extractMermaidBlocks(payload)
+    if (!blocks.length) {
+      artifactPreviewByIndex.value = { ...artifactPreviewByIndex.value, [boxIndex]: undefined }
+      artifactPreviewErrorByIndex.value = {
+        ...artifactPreviewErrorByIndex.value,
+        [boxIndex]: 'Este artefacto no contiene diagramas Mermaid renderizables.',
+      }
+      return
+    }
+
+    artifactPreviewByIndex.value = {
+      ...artifactPreviewByIndex.value,
+      [boxIndex]: {
+        artifactId: art.id,
+        artifactName: art.name,
+        blocks,
+      },
+    }
+  } catch {
+    artifactPreviewByIndex.value = { ...artifactPreviewByIndex.value, [boxIndex]: undefined }
+    artifactPreviewErrorByIndex.value = {
+      ...artifactPreviewErrorByIndex.value,
+      [boxIndex]: 'No fue posible cargar la vista previa de este artefacto.',
+    }
+  } finally {
+    artifactPreviewLoadingByIndex.value = { ...artifactPreviewLoadingByIndex.value, [boxIndex]: false }
   }
 }
 
@@ -230,12 +298,22 @@ async function handleDownloadArtifact(
               <thead>
                 <tr>
                   <th>Nombre</th>
+                  <th>Vista</th>
                   <th>Descarga</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="art in (boxArtifactsByIndex[i] ?? [])" :key="art.id">
                   <td>{{ art.name }}</td>
+                  <td>
+                    <button
+                      type="button"
+                      class="btn btn-preview-inline"
+                      @click="handlePreviewArtifact(i, art)"
+                    >
+                      {{ isPreviewOpen(i, art.id) ? 'Ocultar' : 'Ver' }}
+                    </button>
+                  </td>
                   <td>
                     <button
                       type="button"
@@ -247,10 +325,25 @@ async function handleDownloadArtifact(
                   </td>
                 </tr>
                 <tr v-if="!(boxArtifactsByIndex[i] ?? []).length && !boxArtifactsLoadingByIndex[i]">
-                  <td colspan="2" class="artifacts-empty">Sin artifacts</td>
+                  <td colspan="3" class="artifacts-empty">Sin artifacts</td>
                 </tr>
               </tbody>
             </table>
+            <p v-if="artifactPreviewLoadingByIndex[i]" class="logs-loading">Cargando vista previa...</p>
+            <p v-else-if="artifactPreviewErrorByIndex[i]" class="artifacts-empty">
+              {{ artifactPreviewErrorByIndex[i] }}
+            </p>
+            <div v-else-if="artifactPreviewByIndex[i]" class="mermaid-preview-block">
+              <p class="preview-caption">
+                Vista previa: {{ artifactPreviewByIndex[i]?.artifactName }}
+              </p>
+              <MermaidDiagramPreview
+                v-for="block in artifactPreviewByIndex[i]?.blocks ?? []"
+                :key="`${artifactPreviewByIndex[i]?.artifactId}-${block.key}`"
+                :title="block.title"
+                :code="block.code"
+              />
+            </div>
           </div>
         </template>
       </div>
@@ -529,6 +622,33 @@ async function handleDownloadArtifact(
 
 .btn-download-inline:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-preview-inline {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  background: rgba(16, 185, 129, 0.25);
+  color: #d1fae5;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.btn-preview-inline:hover {
+  background: rgba(16, 185, 129, 0.35);
+}
+
+.mermaid-preview-block {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preview-caption {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .approval-section {

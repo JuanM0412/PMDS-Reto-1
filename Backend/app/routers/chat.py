@@ -20,6 +20,7 @@ from ..orchestration import (
 )
 from ..services import trigger_agent
 from ..settings import settings
+from ..utils.mermaid import normalize_mermaid_artifact
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -122,12 +123,13 @@ def _save_artifact(
     artifact_type: str,
     content: dict[str, Any],
 ) -> Artifact:
+    normalized_content = normalize_mermaid_artifact(content)
     next_version = _get_latest_version(db, run_id, artifact_type) + 1
     artifact = Artifact(
         run_id=run_id,
         artifact_type=artifact_type,
         version=next_version,
-        content_json=json.dumps(content, ensure_ascii=False),
+        content_json=json.dumps(normalized_content, ensure_ascii=False),
         created_at=datetime.utcnow(),
     )
     db.add(artifact)
@@ -455,4 +457,5 @@ def download_artifact(
         raise HTTPException(status_code=400, detail="Artifact does not belong to requested step")
 
     parsed = _safe_json_loads(artifact.content_json)
-    return _extract_artifact_only(parsed)
+    normalized = normalize_mermaid_artifact(parsed)
+    return _extract_artifact_only(normalized)
