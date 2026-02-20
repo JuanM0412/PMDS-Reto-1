@@ -45,15 +45,32 @@ class ChatService extends BaseService {
 
   /**
    * GET logs: obtiene los logs del agente para el step y uuid dados.
+   *
+   * Dado que el agente se ejecuta de forma asíncrona en n8n (fire-and-forget),
+   * es posible que los logs aún no estén disponibles cuando el frontend los
+   * solicita por primera vez.  Para evitar mostrar un panel vacío, se reintenta
+   * la consulta con un pequeño retardo hasta que haya resultados o se agoten
+   * los intentos.
    */
   async getLogs(step: number, uuid: string): Promise<string[]> {
     const url = `${ApiRoutesUtil.apiUrl(CHAT_ROUTES.logs)}?step=${step}&uuid=${encodeURIComponent(uuid)}`
-    try {
-      const data = await this.makeRequest<GetLogsResponseInterface>(url, true, 'GET')
-      return data.logs ?? []
-    } catch {
-      return []
+    const MAX_RETRIES = 10
+    const RETRY_DELAY_MS = 1500
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const data = await this.makeRequest<GetLogsResponseInterface>(url, true, 'GET')
+        const logs = data.logs ?? []
+        if (logs.length > 0 || attempt === MAX_RETRIES) {
+          return logs
+        }
+        // Logs not yet available — wait and retry
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+      } catch {
+        return []
+      }
     }
+    return []
   }
 
   /**
