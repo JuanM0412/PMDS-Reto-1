@@ -3,10 +3,13 @@ import { ref } from 'vue'
 import { useChat } from '@/features/chat/composables/useChat'
 import type { AgentStatus } from '@/features/chat/composables/useChat'
 import MermaidDiagramPreview from '@/features/chat/components/MermaidDiagramPreview.vue'
+import PseudocodePreview from '@/features/chat/components/PseudocodePreview.vue'
 import {
   extractMermaidBlocks,
+  extractPseudocodeBlocks,
   toArtifactPreviewText,
   type MermaidBlockInterface,
+  type PseudocodeBlockInterface,
 } from '@/shared/utils/MermaidArtifactUtil'
 
 const {
@@ -43,6 +46,7 @@ const artifactPreviewByIndex = ref<
         artifactId: string
         artifactName: string
         blocks: MermaidBlockInterface[]
+        pseudocodeBlocks: PseudocodeBlockInterface[]
         payloadPreviewText: string
       }
     | undefined
@@ -180,6 +184,7 @@ async function handlePreviewArtifact(boxIndex: number, art: { id: string; name: 
   try {
     const payload = await fetchArtifactDownload(step, uuid, art.id)
     const blocks = extractMermaidBlocks(payload)
+    const pseudocodeBlocks = extractPseudocodeBlocks(payload)
     const payloadPreviewText = toArtifactPreviewText(payload)
 
     artifactPreviewByIndex.value = {
@@ -188,6 +193,7 @@ async function handlePreviewArtifact(boxIndex: number, art: { id: string; name: 
         artifactId: art.id,
         artifactName: art.name,
         blocks,
+        pseudocodeBlocks,
         payloadPreviewText,
       },
     }
@@ -341,6 +347,18 @@ async function handleDownloadArtifact(
                 <MermaidDiagramPreview
                   v-for="block in artifactPreviewByIndex[i]?.blocks ?? []"
                   :key="`${artifactPreviewByIndex[i]?.artifactId}-${block.key}`"
+                  :title="block.title"
+                  :code="block.code"
+                />
+              </div>
+              <div
+                v-if="(artifactPreviewByIndex[i]?.pseudocodeBlocks?.length ?? 0) > 0"
+                class="artifact-section"
+              >
+                <p class="section-title">Pseudocódigo</p>
+                <PseudocodePreview
+                  v-for="block in artifactPreviewByIndex[i]?.pseudocodeBlocks ?? []"
+                  :key="`${artifactPreviewByIndex[i]?.artifactId}-pseudo-${block.key}`"
                   :title="block.title"
                   :code="block.code"
                 />

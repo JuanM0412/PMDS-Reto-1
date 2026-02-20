@@ -4,6 +4,12 @@ export interface MermaidBlockInterface {
   code: string
 }
 
+export interface PseudocodeBlockInterface {
+  key: string
+  title: string
+  code: string
+}
+
 const MERMAID_PREFIXES = [
   'graph ',
   'flowchart',
@@ -25,6 +31,17 @@ const MERMAID_PREFIXES = [
   'C4Component',
   'C4Dynamic',
   'C4Deployment',
+] as const
+
+const PSEUDOCODE_MARKERS = [
+  'procedure ',
+  'function ',
+  'entradas',
+  'salidas',
+  'inputs',
+  'outputs',
+  'pasos',
+  'algoritmo',
 ] as const
 
 function stripCodeFence(value: string): string {
@@ -66,10 +83,33 @@ export function normalizeMermaidCode(value: string): string {
     .trim()
 }
 
+export function normalizePseudocodeCode(value: string): string {
+  const text = stripCodeFence(
+    value
+      .trim()
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+  )
+
+  return text
+    .split('\n')
+    .map((line) => line.replace(/\t/g, '    ').replace(/\s+$/g, ''))
+    .join('\n')
+    .trim()
+}
+
 export function isLikelyMermaid(value: string): boolean {
   const text = normalizeMermaidCode(value)
   if (!text) return false
   return MERMAID_PREFIXES.some((prefix) => text.startsWith(prefix))
+}
+
+export function isLikelyPseudocode(value: string): boolean {
+  const text = normalizePseudocodeCode(value)
+  if (!text) return false
+  if (isLikelyMermaid(text)) return false
+  const lowered = text.toLowerCase()
+  return PSEUDOCODE_MARKERS.some((marker) => lowered.includes(marker))
 }
 
 function humanizeKey(key: string): string {
@@ -89,6 +129,43 @@ export function extractMermaidBlocks(payload: unknown): MermaidBlockInterface[] 
       const normalized = normalizeMermaidCode(value)
       if (!normalized) return
       if (!hinted && !isLikelyMermaid(normalized)) return
+      if (seen.has(normalized)) return
+      seen.add(normalized)
+      blocks.push({
+        key: path.join('.'),
+        title: humanizeKey(key),
+        code: normalized,
+      })
+      return
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => walk(item, [...path, String(index)]))
+      return
+    }
+
+    if (value && typeof value === 'object') {
+      Object.entries(value as Record<string, unknown>).forEach(([k, v]) => walk(v, [...path, k]))
+    }
+  }
+
+  walk(payload, [])
+  return blocks
+}
+
+export function extractPseudocodeBlocks(payload: unknown): PseudocodeBlockInterface[] {
+  const blocks: PseudocodeBlockInterface[] = []
+  const seen = new Set<string>()
+
+  function walk(value: unknown, path: string[]) {
+    if (typeof value === 'string') {
+      const key = path[path.length - 1] ?? 'pseudocode'
+      const keyLower = key.toLowerCase()
+      const hinted = keyLower.includes('pseudocode') || keyLower.includes('pseudo')
+      const normalized = normalizePseudocodeCode(value)
+      if (!normalized) return
+      if (isLikelyMermaid(normalized)) return
+      if (!hinted && !isLikelyPseudocode(normalized)) return
       if (seen.has(normalized)) return
       seen.add(normalized)
       blocks.push({
