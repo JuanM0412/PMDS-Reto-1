@@ -78,7 +78,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://host.docker.internal:8000/callbacks/agent/{slug}",
+        "url": "=http://host.docker.internal:8000/callbacks/agent/requirements",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
