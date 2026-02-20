@@ -112,3 +112,25 @@ export function extractMermaidBlocks(payload: unknown): MermaidBlockInterface[] 
   walk(payload, [])
   return blocks
 }
+
+export function toArtifactPreviewText(payload: unknown): string {
+  if (typeof payload === 'string') {
+    const text = payload.trim()
+    if (!text) return ''
+    try {
+      return JSON.stringify(JSON.parse(text), null, 2)
+    } catch {
+      return payload
+    }
+  }
+
+  if (payload === undefined) {
+    return ''
+  }
+
+  try {
+    return JSON.stringify(payload, null, 2)
+  } catch {
+    return String(payload)
+  }
+}

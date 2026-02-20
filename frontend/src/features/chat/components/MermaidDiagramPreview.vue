@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const diagramHost = ref<HTMLElement | null>(null)
 const renderError = ref('')
+const renderedSvg = ref('')
 
 mermaid.initialize({
   startOnLoad: false,
@@ -22,6 +23,7 @@ async function renderDiagram() {
   if (!source) {
     diagramHost.value.innerHTML = ''
     renderError.value = ''
+    renderedSvg.value = ''
     return
   }
 
@@ -30,11 +32,28 @@ async function renderDiagram() {
     const renderId = `mermaid-${Math.random().toString(36).slice(2)}`
     const { svg } = await mermaid.render(renderId, source)
     if (!diagramHost.value) return
+    renderedSvg.value = svg
     diagramHost.value.innerHTML = svg
   } catch {
     if (diagramHost.value) diagramHost.value.innerHTML = ''
     renderError.value = 'No se pudo renderizar este diagrama Mermaid.'
+    renderedSvg.value = ''
   }
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^\w\s.-]/gi, '_').replace(/\s+/g, '_') || 'mermaid_diagram'
+}
+
+function downloadSvg() {
+  if (!renderedSvg.value) return
+  const blob = new Blob([renderedSvg.value], { type: 'image/svg+xml;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${sanitizeFileName(props.title)}.svg`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 onMounted(renderDiagram)
@@ -43,7 +62,17 @@ watch(() => props.code, renderDiagram)
 
 <template>
   <div class="mermaid-preview">
-    <p class="mermaid-title">{{ title }}</p>
+    <div class="mermaid-header">
+      <p class="mermaid-title">{{ title }}</p>
+      <button
+        v-if="!renderError && renderedSvg"
+        type="button"
+        class="btn-download-svg"
+        @click="downloadSvg"
+      >
+        Descargar SVG
+      </button>
+    </div>
     <div v-if="renderError" class="mermaid-error">{{ renderError }}</div>
     <div v-else ref="diagramHost" class="mermaid-host" />
     <pre class="mermaid-source">{{ code }}</pre>
@@ -66,6 +95,27 @@ watch(() => props.code, renderDiagram)
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.mermaid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.btn-download-svg {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.2);
+  color: #dbeafe;
+  font-size: 0.6875rem;
+  cursor: pointer;
+}
+
+.btn-download-svg:hover {
+  background: rgba(59, 130, 246, 0.3);
 }
 
 .mermaid-error {

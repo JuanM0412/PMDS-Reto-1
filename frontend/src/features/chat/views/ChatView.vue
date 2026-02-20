@@ -5,6 +5,7 @@ import type { AgentStatus } from '@/features/chat/composables/useChat'
 import MermaidDiagramPreview from '@/features/chat/components/MermaidDiagramPreview.vue'
 import {
   extractMermaidBlocks,
+  toArtifactPreviewText,
   type MermaidBlockInterface,
 } from '@/shared/utils/MermaidArtifactUtil'
 
@@ -42,6 +43,7 @@ const artifactPreviewByIndex = ref<
         artifactId: string
         artifactName: string
         blocks: MermaidBlockInterface[]
+        payloadPreviewText: string
       }
     | undefined
   >
@@ -178,14 +180,7 @@ async function handlePreviewArtifact(boxIndex: number, art: { id: string; name: 
   try {
     const payload = await fetchArtifactDownload(step, uuid, art.id)
     const blocks = extractMermaidBlocks(payload)
-    if (!blocks.length) {
-      artifactPreviewByIndex.value = { ...artifactPreviewByIndex.value, [boxIndex]: undefined }
-      artifactPreviewErrorByIndex.value = {
-        ...artifactPreviewErrorByIndex.value,
-        [boxIndex]: 'Este artefacto no contiene diagramas Mermaid renderizables.',
-      }
-      return
-    }
+    const payloadPreviewText = toArtifactPreviewText(payload)
 
     artifactPreviewByIndex.value = {
       ...artifactPreviewByIndex.value,
@@ -193,6 +188,7 @@ async function handlePreviewArtifact(boxIndex: number, art: { id: string; name: 
         artifactId: art.id,
         artifactName: art.name,
         blocks,
+        payloadPreviewText,
       },
     }
   } catch {
@@ -337,12 +333,22 @@ async function handleDownloadArtifact(
               <p class="preview-caption">
                 Vista previa: {{ artifactPreviewByIndex[i]?.artifactName }}
               </p>
-              <MermaidDiagramPreview
-                v-for="block in artifactPreviewByIndex[i]?.blocks ?? []"
-                :key="`${artifactPreviewByIndex[i]?.artifactId}-${block.key}`"
-                :title="block.title"
-                :code="block.code"
-              />
+              <div
+                v-if="(artifactPreviewByIndex[i]?.blocks?.length ?? 0) > 0"
+                class="artifact-section"
+              >
+                <p class="section-title">Diagramas Mermaid</p>
+                <MermaidDiagramPreview
+                  v-for="block in artifactPreviewByIndex[i]?.blocks ?? []"
+                  :key="`${artifactPreviewByIndex[i]?.artifactId}-${block.key}`"
+                  :title="block.title"
+                  :code="block.code"
+                />
+              </div>
+              <div class="artifact-section">
+                <p class="section-title">Contenido del artefacto</p>
+                <pre class="artifact-json-preview">{{ artifactPreviewByIndex[i]?.payloadPreviewText || 'Sin contenido para mostrar.' }}</pre>
+              </div>
             </div>
           </div>
         </template>
@@ -649,6 +655,33 @@ async function handleDownloadArtifact(
   margin: 0;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.artifact-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #d1d5db;
+  font-weight: 600;
+}
+
+.artifact-json-preview {
+  margin: 0;
+  padding: 0.6rem;
+  border-radius: 0.375rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d1d5db;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 280px;
+  overflow: auto;
 }
 
 .approval-section {
