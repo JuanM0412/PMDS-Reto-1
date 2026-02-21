@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useChat } from '@/features/chat/composables/useChat'
 import type { AgentStatus } from '@/features/chat/composables/useChat'
 import MermaidDiagramPreview from '@/features/chat/components/MermaidDiagramPreview.vue'
@@ -54,6 +54,18 @@ const artifactPreviewByIndex = ref<
 >({})
 const artifactPreviewLoadingByIndex = ref<Record<number, boolean>>({})
 const artifactPreviewErrorByIndex = ref<Record<number, string>>({})
+
+/** Modal de vista previa de artefacto */
+const artifactModalOpen = ref(false)
+const artifactModalLoading = ref(false)
+const artifactModalBoxIndex = ref<number | null>(null)
+const artifactModalArtifactId = ref<string | null>(null)
+const artifactModalContent = ref<{
+  artifactName: string
+  blocks: MermaidBlockInterface[]
+  pseudocodeBlocks: PseudocodeBlockInterface[]
+  payloadPreviewText: string
+} | null>(null)
 
 const AGENT_NAMES = [
   'Requirements Agent',
@@ -165,38 +177,69 @@ async function toggleBoxArtifacts(boxIndex: number) {
 }
 
 function isPreviewOpen(boxIndex: number, artifactId: string): boolean {
-  return artifactPreviewByIndex.value[boxIndex]?.artifactId === artifactId
+  return (
+    artifactModalOpen.value &&
+    artifactModalBoxIndex.value === boxIndex &&
+    artifactModalArtifactId.value === artifactId
+  )
 }
+
+function closeArtifactModal() {
+  artifactModalOpen.value = false
+  artifactModalContent.value = null
+  artifactModalBoxIndex.value = null
+  artifactModalArtifactId.value = null
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && artifactModalOpen.value) closeArtifactModal()
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 async function handlePreviewArtifact(boxIndex: number, art: { id: string; name: string }) {
   const uuid = currentMessageUuid.value
   if (uuid == null) return
 
-  if (isPreviewOpen(boxIndex, art.id)) {
+  if (
+    artifactModalOpen.value &&
+    artifactModalBoxIndex.value === boxIndex &&
+    artifactModalArtifactId.value === art.id
+  ) {
+    closeArtifactModal()
     artifactPreviewByIndex.value = { ...artifactPreviewByIndex.value, [boxIndex]: undefined }
-    artifactPreviewErrorByIndex.value = { ...artifactPreviewErrorByIndex.value, [boxIndex]: '' }
     return
   }
 
   const step = boxIndex + 1
   artifactPreviewLoadingByIndex.value = { ...artifactPreviewLoadingByIndex.value, [boxIndex]: true }
   artifactPreviewErrorByIndex.value = { ...artifactPreviewErrorByIndex.value, [boxIndex]: '' }
+  artifactModalLoading.value = true
+  artifactModalContent.value = null
   try {
     const payload = await fetchArtifactDownload(step, uuid, art.id)
     const blocks = extractMermaidBlocks(payload)
     const pseudocodeBlocks = extractPseudocodeBlocks(payload)
     const payloadPreviewText = toArtifactPreviewText(payload)
 
-    artifactPreviewByIndex.value = {
-      ...artifactPreviewByIndex.value,
-      [boxIndex]: {
-        artifactId: art.id,
-        artifactName: art.name,
-        blocks,
-        pseudocodeBlocks,
-        payloadPreviewText,
-      },
+    const preview = {
+      artifactId: art.id,
+      artifactName: art.name,
+      blocks,
+      pseudocodeBlocks,
+      payloadPreviewText,
     }
+    artifactPreviewByIndex.value = { ...artifactPreviewByIndex.value, [boxIndex]: preview }
+    artifactModalContent.value = {
+      artifactName: art.name,
+      blocks,
+      pseudocodeBlocks,
+      payloadPreviewText,
+    }
+    artifactModalBoxIndex.value = boxIndex
+    artifactModalArtifactId.value = art.id
+    artifactModalOpen.value = true
   } catch {
     artifactPreviewByIndex.value = { ...artifactPreviewByIndex.value, [boxIndex]: undefined }
     artifactPreviewErrorByIndex.value = {
@@ -205,6 +248,7 @@ async function handlePreviewArtifact(boxIndex: number, art: { id: string; name: 
     }
   } finally {
     artifactPreviewLoadingByIndex.value = { ...artifactPreviewLoadingByIndex.value, [boxIndex]: false }
+    artifactModalLoading.value = false
   }
 }
 
@@ -335,43 +379,73 @@ async function handleDownloadArtifact(
             <p v-else-if="artifactPreviewErrorByIndex[i]" class="artifacts-empty">
               {{ artifactPreviewErrorByIndex[i] }}
             </p>
-            <div v-else-if="artifactPreviewByIndex[i]" class="mermaid-preview-block">
-              <p class="preview-caption">
-                Vista previa: {{ artifactPreviewByIndex[i]?.artifactName }}
-              </p>
-              <div
-                v-if="(artifactPreviewByIndex[i]?.blocks?.length ?? 0) > 0"
-                class="artifact-section"
-              >
-                <p class="section-title">Diagramas Mermaid</p>
-                <MermaidDiagramPreview
-                  v-for="block in artifactPreviewByIndex[i]?.blocks ?? []"
-                  :key="`${artifactPreviewByIndex[i]?.artifactId}-${block.key}`"
-                  :title="block.title"
-                  :code="block.code"
-                />
-              </div>
-              <div
-                v-if="(artifactPreviewByIndex[i]?.pseudocodeBlocks?.length ?? 0) > 0"
-                class="artifact-section"
-              >
-                <p class="section-title">Pseudocódigo</p>
-                <PseudocodePreview
-                  v-for="block in artifactPreviewByIndex[i]?.pseudocodeBlocks ?? []"
-                  :key="`${artifactPreviewByIndex[i]?.artifactId}-pseudo-${block.key}`"
-                  :title="block.title"
-                  :code="block.code"
-                />
-              </div>
-              <div class="artifact-section">
-                <p class="section-title">Contenido del artefacto</p>
-                <pre class="artifact-json-preview">{{ artifactPreviewByIndex[i]?.payloadPreviewText || 'Sin contenido para mostrar.' }}</pre>
-              </div>
-            </div>
           </div>
         </template>
       </div>
     </section>
+
+    <!-- Modal de vista previa de artefacto (un solo modal para todos los agentes) -->
+    <Teleport to="body">
+      <Transition name="artifact-modal">
+        <div
+          v-if="artifactModalOpen"
+          class="artifact-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="artifact-modal-title"
+          @click.self="closeArtifactModal"
+        >
+          <div class="artifact-modal-panel">
+            <div class="artifact-modal-header">
+              <h2 id="artifact-modal-title" class="artifact-modal-title">
+                {{ artifactModalContent?.artifactName ?? 'Vista previa' }}
+              </h2>
+              <button
+                type="button"
+                class="artifact-modal-close"
+                aria-label="Cerrar"
+                @click="closeArtifactModal"
+              >
+                ×
+              </button>
+            </div>
+            <div class="artifact-modal-body">
+              <p v-if="artifactModalLoading" class="logs-loading">Cargando vista previa...</p>
+              <template v-else-if="artifactModalContent">
+                <div
+                  v-if="(artifactModalContent.blocks?.length ?? 0) > 0"
+                  class="artifact-modal-section"
+                >
+                  <p class="section-title">Diagramas Mermaid</p>
+                  <MermaidDiagramPreview
+                    v-for="block in artifactModalContent.blocks"
+                    :key="block.key"
+                    :title="block.title"
+                    :code="block.code"
+                  />
+                </div>
+                <div
+                  v-if="(artifactModalContent.pseudocodeBlocks?.length ?? 0) > 0"
+                  class="artifact-modal-section"
+                >
+                  <p class="section-title">Pseudocódigo</p>
+                  <PseudocodePreview
+                    v-for="block in artifactModalContent.pseudocodeBlocks"
+                    :key="`pseudo-${block.key}`"
+                    :title="block.title"
+                    :code="block.code"
+                  />
+                </div>
+                <div class="artifact-modal-section">
+                  <p class="section-title">Contenido del artefacto</p>
+                  <pre class="artifact-modal-json">{{ artifactModalContent.payloadPreviewText || 'Sin contenido para mostrar.' }}</pre>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <template v-if="pendingApprovalMessage">
       <section class="approval-section">
@@ -837,5 +911,124 @@ async function handleDownloadArtifact(
   color: var(--text-muted);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Modal de vista previa de artefacto */
+.artifact-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.artifact-modal-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 56rem;
+  max-height: 90vh;
+  border-radius: 0.75rem;
+  background: var(--header-bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.artifact-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.artifact-modal-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.artifact-modal-close {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.artifact-modal-close:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.artifact-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.artifact-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.artifact-modal-section .section-title {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #d1d5db;
+  font-weight: 600;
+}
+
+.artifact-modal-json {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d1d5db;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.artifact-modal-enter-active,
+.artifact-modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.artifact-modal-enter-from,
+.artifact-modal-leave-to {
+  opacity: 0;
+}
+
+.artifact-modal-enter-active .artifact-modal-panel,
+.artifact-modal-leave-active .artifact-modal-panel {
+  transition: transform 0.2s ease;
+}
+
+.artifact-modal-enter-from .artifact-modal-panel,
+.artifact-modal-leave-to .artifact-modal-panel {
+  transform: scale(0.96);
 }
 </style>
