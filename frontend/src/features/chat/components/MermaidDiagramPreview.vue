@@ -15,6 +15,7 @@ mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
   securityLevel: 'loose',
+  suppressErrorRendering: true, // evita que Mermaid inyecte el mensaje "Syntax error in text" en el DOM
 })
 
 async function renderDiagram() {
@@ -34,9 +35,10 @@ async function renderDiagram() {
     if (!diagramHost.value) return
     renderedSvg.value = svg
     diagramHost.value.innerHTML = svg
-  } catch {
+  } catch (_err) {
     if (diagramHost.value) diagramHost.value.innerHTML = ''
-    renderError.value = 'No se pudo renderizar este diagrama Mermaid.'
+    document.querySelectorAll('.mermaid-error-icon, [data-mermaid-error]').forEach((el) => el.remove())
+    renderError.value = 'No se pudo renderizar este diagrama Mermaid (revisa la sintaxis del código).'
     renderedSvg.value = ''
   }
 }
