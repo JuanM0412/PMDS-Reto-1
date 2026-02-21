@@ -59,7 +59,10 @@ class ChatService extends BaseService {
   /**
    * GET artifacts: obtiene los artifacts del agente para el step y uuid dados.
    */
-  async getArtifacts(step: number, uuid: string): Promise<{ id: string; name: string }[]> {
+  async getArtifacts(
+    step: number,
+    uuid: string
+  ): Promise<{ id: string; name: string; download_filename: string }[]> {
     const url = `${ApiRoutesUtil.apiUrl(CHAT_ROUTES.artifacts)}?step=${step}&uuid=${encodeURIComponent(uuid)}`
     try {
       const data = await this.makeRequest<GetArtifactsResponseInterface>(url, true, 'GET')

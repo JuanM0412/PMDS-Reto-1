@@ -37,7 +37,9 @@ const boxLogsByIndex = ref<Record<number, string[]>>({})
 const boxLogsLoadingByIndex = ref<Record<number, boolean>>({})
 /** Índices de cuadros con tabla de artifacts abierta */
 const openArtifactsBoxIndices = ref<number[]>([])
-const boxArtifactsByIndex = ref<Record<number, { id: string; name: string }[]>>({})
+const boxArtifactsByIndex = ref<
+  Record<number, { id: string; name: string; download_filename?: string }[]>
+>({})
 const boxArtifactsLoadingByIndex = ref<Record<number, boolean>>({})
 const artifactPreviewByIndex = ref<
   Record<
@@ -100,11 +102,27 @@ function handleReject() {
   showRejectBox.value = true
 }
 
-function handleSubmitFeedback() {
+async function handleSubmitFeedback() {
   if (!pendingApprovalMessage.value || !feedbackText.value.trim()) return
-  rejectAgent(pendingApprovalMessage.value.id, feedbackText.value.trim())
+  const agentIndex = pendingApprovalMessage.value.requiresApproval?.agentIndex
+  const uuid = currentMessageUuid.value
+  await rejectAgent(pendingApprovalMessage.value.id, feedbackText.value.trim())
   feedbackText.value = ''
   showRejectBox.value = false
+  // Si el panel de artifacts de este step está abierto, refrescar la lista para que aparezca el nuevo artefacto
+  if (uuid != null && agentIndex != null) {
+    const boxIndex = agentIndex - 1
+    if (openArtifactsBoxIndices.value.includes(boxIndex)) {
+      const step = agentIndex
+      boxArtifactsLoadingByIndex.value = { ...boxArtifactsLoadingByIndex.value, [boxIndex]: true }
+      try {
+        const artifacts = await fetchArtifacts(step, uuid)
+        boxArtifactsByIndex.value = { ...boxArtifactsByIndex.value, [boxIndex]: artifacts }
+      } finally {
+        boxArtifactsLoadingByIndex.value = { ...boxArtifactsLoadingByIndex.value, [boxIndex]: false }
+      }
+    }
+  }
 }
 
 function handleCancelFeedback() {
@@ -258,20 +276,23 @@ function sanitizeFileName(name: string): string {
 
 async function handleDownloadArtifact(
   boxIndex: number,
-  art: { id: string; name: string }
+  artifactId: string,
+  downloadFilename: string | undefined,
+  fallbackName: string
 ) {
   const uuid = currentMessageUuid.value
   if (uuid == null) return
   const step = boxIndex + 1
   try {
-    const json = await fetchArtifactDownload(step, uuid, art.id)
+    const json = await fetchArtifactDownload(step, uuid, artifactId)
     const blob = new Blob([JSON.stringify(json, null, 2)], {
       type: 'application/json',
     })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${sanitizeFileName(art.name)}.json`
+    const baseName = downloadFilename ?? sanitizeFileName(fallbackName)
+    a.download = `${baseName}.json`
     a.click()
     URL.revokeObjectURL(url)
   } catch {
@@ -350,7 +371,7 @@ async function handleDownloadArtifact(
               </thead>
               <tbody>
                 <tr v-for="art in (boxArtifactsByIndex[i] ?? [])" :key="art.id">
-                  <td>{{ art.name }}</td>
+                  <td :title="art.name">{{ art.download_filename ?? art.name }}</td>
                   <td>
                     <button
                       type="button"
@@ -364,7 +385,7 @@ async function handleDownloadArtifact(
                     <button
                       type="button"
                       class="btn btn-download-inline"
-                      @click="handleDownloadArtifact(i, art)"
+                      @click.prevent="handleDownloadArtifact(i, art.id, art.download_filename, art.name)"
                     >
                       Descargar
                     </button>

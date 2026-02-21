@@ -22,6 +22,8 @@ export interface GetLogsResponseInterface {
 export interface ChatArtifactInterface {
   id: string
   name: string
+  /** Nombre para descarga: REQ-001, INC-001, US-001, TC-001, etc. */
+  download_filename: string
 }
 
 export interface GetArtifactsResponseInterface {

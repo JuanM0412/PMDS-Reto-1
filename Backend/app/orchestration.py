@@ -68,6 +68,21 @@ PIPELINE_SLUGS = [step.slug for step in PIPELINE_STEPS]
 PIPELINE_BY_SLUG = {step.slug: step for step in PIPELINE_STEPS}
 PIPELINE_BY_ORDER = {step.order: step for step in PIPELINE_STEPS}
 
+# Prefijos para nombre de archivo al descargar artefactos (xxx = versión 001, 002, ...)
+DOWNLOAD_PREFIX_BY_ARTIFACT_TYPE: dict[str, str] = {
+    "requirements": "REQ",
+    "inception": "INC",
+    "agile": "US",
+    "diagramacion": "DIA",
+    "pseudocodigo": "PSE",
+    "qa": "TC",
+}
+
+
+def get_download_filename(artifact_type: str, version: int) -> str:
+    prefix = DOWNLOAD_PREFIX_BY_ARTIFACT_TYPE.get(artifact_type, "ART")
+    return f"{prefix}-{version:03d}"
+
 
 def get_pipeline_step(slug: str) -> PipelineStep | None:
     return PIPELINE_BY_SLUG.get(slug)

@@ -15,6 +15,7 @@ from ..db import get_db
 from ..models import Artifact, Run, StepExecution, StepLog
 from ..orchestration import (
     build_context_for_agent,
+    get_download_filename,
     get_latest_artifacts_by_type,
     get_pipeline_step_by_order,
 )
@@ -51,6 +52,7 @@ class ChatArtifactItem(BaseModel):
 
     id: str
     name: str
+    download_filename: str  # ej. REQ-001, INC-002, US-001, TC-001
 
 
 class GetArtifactsResponse(BaseModel):
@@ -427,6 +429,7 @@ def get_artifacts(
         ChatArtifactItem(
             id=str(row.id),
             name=f"{step_def.name} v{row.version} - {row.created_at.strftime('%Y-%m-%d %H:%M:%S')}",
+            download_filename=get_download_filename(step_def.artifact_type, row.version),
         )
         for row in rows
     ]
@@ -457,5 +460,8 @@ def download_artifact(
         raise HTTPException(status_code=400, detail="Artifact does not belong to requested step")
 
     parsed = _safe_json_loads(artifact.content_json)
-    normalized = normalize_mermaid_artifact(parsed)
+    try:
+        normalized = normalize_mermaid_artifact(parsed)
+    except Exception:
+        normalized = parsed
     return _extract_artifact_only(normalized)
