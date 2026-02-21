@@ -304,7 +304,7 @@ async function handleDownloadArtifact(
 <template>
   <div class="pipeline-view">
     <header class="pipeline-header">
-      <h1 class="pipeline-title">Pipeline</h1>
+      <h1 class="pipeline-title">Multiagente para desarrollo de super apps</h1>
       <p class="pipeline-subtitle">Escribe el mensaje inicial para desencadenar el flujo de agentes.</p>
     </header>
 

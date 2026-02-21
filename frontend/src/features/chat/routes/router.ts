@@ -6,6 +6,6 @@ export default [
     path: '/',
     name: 'chat',
     component: ChatView,
-    meta: { title: 'Chat' },
+    meta: { title: 'Multiagente para desarrollo de super apps' },
   },
 ] as RouteRecordRaw[]
